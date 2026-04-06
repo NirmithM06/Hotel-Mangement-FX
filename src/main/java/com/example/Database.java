@@ -7,7 +7,6 @@ public class Database {
     private static final String URL = "jdbc:sqlite:hotel.db";
 
     public static Connection connect() throws Exception {
-        System.out.println("Connecting to DB...");
         return DriverManager.getConnection(URL);
     }
 
@@ -19,7 +18,9 @@ public class Database {
                     "roomNumber INTEGER PRIMARY KEY, " +
                     "type TEXT, " +
                     "price REAL, " +
-                    "isBooked INTEGER)";
+                    "isBooked INTEGER, " +
+                    "customerName TEXT, " +
+                    "phone TEXT)";
 
             stmt.execute(sql);
 

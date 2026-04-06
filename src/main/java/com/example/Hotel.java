@@ -1,32 +1,33 @@
-import java.io.*;
-import java.util.ArrayList;
 import java.sql.*;
+import java.util.ArrayList;
 
 public class Hotel {
 
     public void addRoom(Room r) {
         try (Connection conn = Database.connect();
              PreparedStatement ps = conn.prepareStatement(
-                     "INSERT INTO rooms (roomNumber, type, price, isBooked) VALUES (?, ?, ?, ?)"
+                     "INSERT INTO rooms (roomNumber, type, price, isBooked, customerName, phone) VALUES (?, ?, ?, 0, NULL, NULL)"
              )) {
 
             ps.setInt(1, r.getRoomNumber());
             ps.setString(2, r.getType());
             ps.setDouble(3, r.getPrice());
-            ps.setInt(4, 0);
             ps.executeUpdate();
-            System.out.println("Room inserted: " + r.getRoomNumber());
+
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public boolean bookRoom(int roomNo) {
+    public boolean bookRoom(int roomNo, String name, String phone) {
         try (Connection conn = Database.connect();
              PreparedStatement ps = conn.prepareStatement(
-                     "UPDATE rooms SET isBooked = 1 WHERE roomNumber = ? AND isBooked = 0")) {
+                     "UPDATE rooms SET isBooked=1, customerName=?, phone=? WHERE roomNumber=? AND isBooked=0"
+             )) {
 
-            ps.setInt(1, roomNo);
+            ps.setString(1, name);
+            ps.setString(2, phone);
+            ps.setInt(3, roomNo);
             return ps.executeUpdate() > 0;
 
         } catch (Exception e) {
@@ -34,10 +35,12 @@ public class Hotel {
         }
         return false;
     }
+
     public boolean checkoutRoom(int roomNo) {
         try (Connection conn = Database.connect();
              PreparedStatement ps = conn.prepareStatement(
-                     "UPDATE rooms SET isBooked = 0 WHERE roomNumber = ? AND isBooked = 1")) {
+                     "UPDATE rooms SET isBooked=0, customerName=NULL, phone=NULL WHERE roomNumber=?"
+             )) {
 
             ps.setInt(1, roomNo);
             return ps.executeUpdate() > 0;
@@ -47,10 +50,11 @@ public class Hotel {
         }
         return false;
     }
+
     public Room findRoom(int roomNo) {
         try (Connection conn = Database.connect();
              PreparedStatement ps = conn.prepareStatement(
-                     "SELECT * FROM rooms WHERE roomNumber = ?")) {
+                     "SELECT * FROM rooms WHERE roomNumber=?")) {
 
             ps.setInt(1, roomNo);
             ResultSet rs = ps.executeQuery();
@@ -63,7 +67,7 @@ public class Hotel {
                 );
 
                 if (rs.getInt("isBooked") == 1) {
-                    r.bookRoom();
+                    r.bookRoom(rs.getString("customerName"), rs.getString("phone"));
                 }
 
                 return r;
@@ -72,7 +76,6 @@ public class Hotel {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         return null;
     }
 
@@ -91,7 +94,7 @@ public class Hotel {
                 );
 
                 if (rs.getInt("isBooked") == 1) {
-                    r.bookRoom();
+                    r.bookRoom(rs.getString("customerName"), rs.getString("phone"));
                 }
 
                 list.add(r);
