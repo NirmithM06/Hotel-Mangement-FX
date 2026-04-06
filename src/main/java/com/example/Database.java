@@ -20,7 +20,10 @@ public class Database {
                     "price REAL, " +
                     "isBooked INTEGER, " +
                     "customerName TEXT, " +
-                    "phone TEXT)";
+                    "phone TEXT, " +
+                    "checkIn TEXT, " +
+                    "checkOut TEXT, " +
+                    "totalAmount REAL)";
 
             stmt.execute(sql);
 

@@ -1,24 +1,23 @@
 import javafx.application.Application;
-import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
+
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 
 public class MainApp extends Application {
 
-    Hotel hotel = new Hotel();
-    TextArea display = new TextArea();
+    private Hotel hotel = new Hotel();
+    private TextArea display = new TextArea();
 
     @Override
     public void start(Stage stage) {
 
         Database.init();
 
-        // 🔷 Title
         Label title = new Label("🏨 Hotel Management System");
         title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold;");
 
@@ -27,7 +26,6 @@ public class MainApp extends Application {
 
         VBox header = new VBox(5, title, subtitle);
 
-        // 🔷 Inputs
         TextField roomNoField = new TextField();
         roomNoField.setPromptText("Room Number");
 
@@ -47,21 +45,19 @@ public class MainApp extends Application {
         TextField phoneField = new TextField();
         phoneField.setPromptText("Phone Number");
 
-        // 🔷 Buttons
         Button addBtn = new Button("Add Room");
         Button viewBtn = new Button("View Rooms");
         Button bookBtn = new Button("Book Room");
         Button checkoutBtn = new Button("Checkout");
         Button searchBtn = new Button("Search Room");
 
-        // 🔥 Styling
+        //  Styling
         addBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
         bookBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
         checkoutBtn.setStyle("-fx-background-color: #f44336; -fx-text-fill: white;");
         viewBtn.setStyle("-fx-background-color: #555; -fx-text-fill: white;");
         searchBtn.setStyle("-fx-background-color: #673AB7; -fx-text-fill: white;");
 
-        // 🔷 Layout
         GridPane form = new GridPane();
         form.setHgap(15);
         form.setVgap(15);
@@ -99,15 +95,10 @@ public class MainApp extends Application {
         VBox root = new VBox(20, header, card, display);
         root.setPadding(new Insets(20));
 
-        // ================== LOGIC ==================
-
-        // ➕ Add Room
+        // ================= ADD ROOM =================
         addBtn.setOnAction(e -> {
             try {
-                if (roomNoField.getText().isEmpty() ||
-                        priceField.getText().isEmpty() ||
-                        typeBox.getValue() == null) {
-
+                if (roomNoField.getText().isEmpty() || priceField.getText().isEmpty() || typeBox.getValue() == null) {
                     showAlert("Fill all room details!");
                     return;
                 }
@@ -125,12 +116,14 @@ public class MainApp extends Application {
 
                 clear(roomNoField, typeBox, priceField, checkInDate, checkOutDate, nameField, phoneField);
 
+            } catch (NumberFormatException ex) {
+                showAlert("Room number and price must be valid numbers!");
             } catch (Exception ex) {
                 showAlert("Invalid input!");
             }
         });
 
-        // 👁 View Rooms
+        // ================= VIEW =================
         viewBtn.setOnAction(e -> {
             StringBuilder sb = new StringBuilder();
 
@@ -138,61 +131,63 @@ public class MainApp extends Application {
                 sb.append("Room ").append(r.getRoomNumber())
                         .append(" | ").append(r.getType())
                         .append(" | ₹").append(r.getPrice())
-                        .append(" | ")
-                        .append(r.isBooked() ? "Booked" : "Available");
+                        .append(" | ").append(r.isBooked() ? "Booked" : "Available");
 
                 if (r.isBooked()) {
                     sb.append(" | ").append(r.getCustomerName())
-                            .append(" | ").append(r.getPhone());
+                            .append(" | ").append(r.getPhone())
+                            .append(" | ").append(r.getCheckIn())
+                            .append(" → ").append(r.getCheckOut())
+                            .append(" | ₹").append(r.getTotalAmount());
                 }
-
                 sb.append("\n");
             }
 
-            display.setText(sb.toString());
+            if (sb.length() == 0) {
+                display.setText("No rooms found in the hotel.");
+            } else {
+                display.setText(sb.toString());
+            }
         });
 
-        // 🏨 Book Room
+        // ================= BOOK =================
         bookBtn.setOnAction(e -> {
             try {
-                // 1. Basic empty field validation
                 if (roomNoField.getText().isEmpty() || nameField.getText().isEmpty() || phoneField.getText().isEmpty()) {
                     showAlert("Enter all booking details!");
                     return;
                 }
 
-                // 2. Format validation
                 if (!isValidName(nameField.getText())) {
                     showAlert("Name should contain only letters!");
                     return;
                 }
 
                 if (!isValidPhone(phoneField.getText())) {
-                    showAlert("Phone number must be exactly 10 digits!");
+                    showAlert("Phone must be exactly 10 digits!");
                     return;
                 }
 
                 int roomNo = Integer.parseInt(roomNoField.getText());
 
-                // 3. Date validation
                 if (checkInDate.getValue() == null || checkOutDate.getValue() == null) {
                     showAlert("Select dates!");
                     return;
                 }
 
                 if (checkInDate.getValue().isBefore(LocalDate.now())) {
-                    showAlert("Invalid check-in date!");
+                    showAlert("Invalid check-in date! Cannot book in the past.");
                     return;
                 }
 
                 long days = ChronoUnit.DAYS.between(checkInDate.getValue(), checkOutDate.getValue());
                 if (days <= 0) {
-                    showAlert("Invalid date range!");
+                    showAlert("Invalid date range! Check-out must be after check-in.");
                     return;
                 }
 
-                // 4. Room availability validation
                 Room room = hotel.findRoom(roomNo);
+
                 if (room == null) {
                     showAlert("Room does not exist!");
                     return;
@@ -203,67 +198,101 @@ public class MainApp extends Application {
                     return;
                 }
 
-                // 5. Execute booking
-                boolean success = hotel.bookRoom(roomNo, nameField.getText(), phoneField.getText());
+                double bill = room.getPrice() * days;
+
+                boolean success = hotel.bookRoom(
+                        roomNo,
+                        nameField.getText(),
+                        phoneField.getText(),
+                        checkInDate.getValue().toString(),
+                        checkOutDate.getValue().toString(),
+                        bill
+                );
 
                 if (success) {
-                    double bill = room.getPrice() * days;
-                    showAlert("Booking Successful!\n\n" +
-                            "Room: " + roomNo + "\n" +
-                            "Customer: " + nameField.getText() + "\n" +
-                            "Days: " + days + "\n" +
-                            "Total Bill: ₹" + bill);
+                    showAlert("Booking Successful!\nRoom: " + roomNo +
+                            "\nDays: " + days +
+                            "\nTotal: ₹" + bill);
+                    clear(roomNoField, typeBox, priceField, checkInDate, checkOutDate, nameField, phoneField);
                 } else {
-                    showAlert("Booking failed!");
+                    showAlert("Booking failed! Database error.");
                 }
 
-                // 6. Reset UI
-                clear(roomNoField, typeBox, priceField, checkInDate, checkOutDate, nameField, phoneField);
-
+            } catch (NumberFormatException ex) {
+                showAlert("Room number must be a valid integer!");
             } catch (Exception ex) {
-                showAlert("Error!");
+                ex.printStackTrace();
+                showAlert("An unexpected error occurred!");
             }
         });
 
-        // 🚪 Checkout
+        // ================= CHECKOUT =================
         checkoutBtn.setOnAction(e -> {
             try {
-                int no = Integer.parseInt(roomNoField.getText());
-
-                if (hotel.checkoutRoom(no)) {
-                    showAlert("Checked out!");
-                } else {
-                    showAlert("Failed!");
+                if (roomNoField.getText().isEmpty()) {
+                    showAlert("Enter the Room Number to checkout!");
+                    return;
                 }
 
-                clear(roomNoField, typeBox, priceField, checkInDate, checkOutDate, nameField, phoneField);
+                int no = Integer.parseInt(roomNoField.getText());
+                Room r = hotel.findRoom(no);
 
+                if (r == null || !r.isBooked()) {
+                    showAlert("Room not found or not currently booked!");
+                    return;
+                }
+
+                String receipt = "===== HOTEL RECEIPT =====\n" +
+                        "Room No: " + r.getRoomNumber() + "\n" +
+                        "Customer: " + r.getCustomerName() + "\n" +
+                        "Phone: " + r.getPhone() + "\n" +
+                        "Check-In: " + r.getCheckIn() + "\n" +
+                        "Check-Out: " + r.getCheckOut() + "\n" +
+                        "Total: ₹" + r.getTotalAmount() + "\n" +
+                        "========================";
+
+                showAlert(receipt);
+
+                boolean outSuccess = hotel.checkoutRoom(no);
+                if (outSuccess) {
+                    clear(roomNoField, typeBox, priceField, checkInDate, checkOutDate, nameField, phoneField);
+                }
+
+            } catch (NumberFormatException ex) {
+                showAlert("Room number must be a valid integer!");
             } catch (Exception ex) {
-                showAlert("Error!");
+                showAlert("An unexpected error occurred during checkout!");
             }
         });
 
-        // 🔍 Search
+        // ================= SEARCH =================
         searchBtn.setOnAction(e -> {
             try {
-                int no = Integer.parseInt(roomNoField.getText());
+                if (roomNoField.getText().isEmpty()) {
+                    showAlert("Enter a Room Number to search!");
+                    return;
+                }
 
+                int no = Integer.parseInt(roomNoField.getText());
                 Room r = hotel.findRoom(no);
 
                 if (r != null) {
-                    showAlert("Room: " + r.getRoomNumber()
-                            + "\nType: " + r.getType()
-                            + "\nStatus: " + (r.isBooked() ? "Booked" : "Available"));
+                    showAlert("Room: " + r.getRoomNumber() +
+                            "\nType: " + r.getType() +
+                            "\nPrice: ₹" + r.getPrice() +
+                            "\nStatus: " + (r.isBooked() ? "Booked by " + r.getCustomerName() : "Available"));
                 } else {
-                    showAlert("Not found!");
+                    showAlert("Room Not found!");
                 }
 
+            } catch (NumberFormatException ex) {
+                showAlert("Room number must be a valid integer!");
             } catch (Exception ex) {
                 showAlert("Invalid input!");
             }
         });
 
-        Scene scene = new Scene(root, 550, 600);
+        Scene scene = new Scene(root, 580, 650);
         stage.setTitle("Hotel Management");
         stage.setScene(scene);
         stage.show();
@@ -279,6 +308,8 @@ public class MainApp extends Application {
 
     private void showAlert(String msg) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("System Message");
+        alert.setHeaderText(null);
         alert.setContentText(msg);
         alert.show();
     }
@@ -296,6 +327,6 @@ public class MainApp extends Application {
     }
 
     public static void main(String[] args) {
-        launch();
+        launch(args);
     }
 }
